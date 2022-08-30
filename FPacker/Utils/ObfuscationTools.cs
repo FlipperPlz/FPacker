@@ -74,7 +74,7 @@ public static class ObfuscationTools {
 
     public static MemoryStream GenerateIncludeText(string prefix, string including) {
         var b = new StringBuilder();
-        b.Append($"#pragma balls <{prefix}/{GetRandomIllegalFilename()}>");
+        b.Append($"// Mr. Robot raped Elliot");
         b.Append("\n/*").Append($"#include \"{prefix}/{GenerateObfuscatedPath()}\"\n");
         b.Append("*/\n/*/\n").Append($"#include \"{prefix}/{including}\"\n").Append("*/");
         return new MemoryStream(Encoding.UTF8.GetBytes(b.ToString()));

@@ -32,14 +32,14 @@ public class PBOEntry : IDisposable {
 
         switch ((PackingTypeFlags) PackingType) {
             case PackingTypeFlags.Uncompressed: {
-                writer.Write((ulong) EntryData.Length);
+                writer.Write(BitConverter.GetBytes(EntryData.Length), 0, 4);
                 break;
             }
             case PackingTypeFlags.Compressed: {
                 var memStream = new MemoryStream();
                 EntryData.CopyTo(memStream);
                 var compressedBytes = BisCompression.Compress(memStream.ToArray());
-                writer.Write(BitConverter.GetBytes((long) compressedBytes.LongLength), 0, 4);
+                writer.Write(BitConverter.GetBytes(compressedBytes.Length), 0, 4);
                 
                 EntryData.Close();
                 EntryData = new MemoryStream(compressedBytes);
@@ -56,7 +56,7 @@ public class PBOEntry : IDisposable {
         writer.Write(data.ToArray());
         var jump = writer.BaseStream.Position;
         writer.BaseStream.Position = (long)OffsetLocation;
-        writer.Write(BitConverter.GetBytes(Offset), 0, 4);
+        writer.Write(BitConverter.GetBytes((long) Offset), 0, 4);
         writer.BaseStream.Position = jump;
     }
 

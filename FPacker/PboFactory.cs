@@ -17,8 +17,9 @@ public class PboFactory : IDisposable {
     private bool _disposed;
 
     public PboFactory(string prefix) {
+        _prefix = prefix;
         _headers.Add("prefix", prefix);
-        _entries.Add(new PBOEntry("%FPACKER%", new MemoryStream(Encoding.UTF8.GetBytes($"PREFIX = {prefix}")), (int) PackingTypeFlags.Compressed));
+        _entries.Add(new PBOEntry("%FPACKER%", new MemoryStream(Encoding.UTF8.GetBytes($"PREFIX = {prefix}")), (int) PackingTypeFlags.Uncompressed));
     }
     
     public PboFactory WithEntries(IEnumerable<PBOEntry> entries) {
@@ -38,11 +39,11 @@ public class PboFactory : IDisposable {
                 incPathTwo = ObfuscationTools.GenerateObfuscatedPath(),
                 incPathThree = ObfuscationTools.GenerateObfuscatedPath(),
                 incPathFour = ObfuscationTools.GenerateObfuscatedPath();
-            _entries.Add(new PBOEntry(entry.EntryName, ObfuscationTools.GenerateIncludeText(_prefix, incPathOne), (int) PackingTypeFlags.Compressed));
-            _entries.Add(new PBOEntry(incPathOne, ObfuscationTools.GenerateIncludeText(_prefix, incPathTwo), (int) PackingTypeFlags.Compressed));
-            _entries.Add(new PBOEntry(incPathTwo, ObfuscationTools.GenerateIncludeText(_prefix, incPathThree), (int) PackingTypeFlags.Compressed));
-            _entries.Add(new PBOEntry(incPathThree, ObfuscationTools.GenerateIncludeText(_prefix, incPathFour), (int) PackingTypeFlags.Compressed));
-            _entries.Add(new PBOEntry(incPathFour, entry.EntryData, (int) PackingTypeFlags.Compressed));
+            _entries.Add(new PBOEntry(entry.EntryName, ObfuscationTools.GenerateIncludeText(_prefix, incPathOne), entry.PackingType));
+            _entries.Add(new PBOEntry(incPathOne, ObfuscationTools.GenerateIncludeText(_prefix, incPathTwo), entry.PackingType));
+            _entries.Add(new PBOEntry(incPathTwo, ObfuscationTools.GenerateIncludeText(_prefix, incPathThree), entry.PackingType));
+            _entries.Add(new PBOEntry(incPathThree, ObfuscationTools.GenerateIncludeText(_prefix, incPathFour), entry.PackingType));
+            _entries.Add(new PBOEntry(incPathFour, entry.EntryData, entry.PackingType));
         } else {
             _entries.Add(entry);
         }
@@ -85,10 +86,6 @@ public class PboFactory : IDisposable {
             
             foreach (var entry in _entries) {
                 entry.WriteEntryData(writer);
-                for (var i = 0; i < 5; i++) {
-                    writer.Write("Sunnyvale Sucks. If you're reading this stop snooping in this obfuscated PBO.\n" +
-                                 "Ra ra Rasputin lover of the Russian queen.\n");
-                }
             }
             
             var checksum = CalculatePBOChecksum(stream);
