@@ -21,8 +21,6 @@ public class PboFactory : IDisposable {
         _entries.Add(new PBOEntry("%FPACKER%", new MemoryStream(Encoding.UTF8.GetBytes($"PREFIX = {prefix}")), (int) PackingTypeFlags.Compressed));
     }
     
-    
-
     public PboFactory WithEntries(IEnumerable<PBOEntry> entries) {
         _entries.AddRange(entries);
         return this;
@@ -75,9 +73,7 @@ public class PboFactory : IDisposable {
             
             writer.Write((byte) 0x00);
 
-            foreach (var entry in _entries) {
-                entry.WriteMetaData(writer);
-            }
+            foreach (var entry in _entries) entry.WriteMetaData(writer);
 
             writer.WriteAsciiZ(string.Empty);
             writer.Write((int) 0x00);

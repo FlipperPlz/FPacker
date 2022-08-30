@@ -24,11 +24,11 @@ public class PBOEntry : IDisposable {
 
     public void WriteMetaData(BinaryWriter writer) {
         writer.WriteAsciiZ(EntryName);
-        writer.Write(PackingType);
-        writer.Write((ulong) EntryData.Length);
+        writer.Write(BitConverter.GetBytes(PackingType), 0, 4);
+        writer.Write(BitConverter.GetBytes(EntryData.Length), 0, 4);
         OffsetLocation = (ulong) writer.BaseStream.Position;
-        writer.Write((ulong) 0);
-        writer.Write((ulong) 0);
+        writer.Write(BitConverter.GetBytes((long) 0), 0, 4);
+        writer.Write(BitConverter.GetBytes((long) 0), 0, 4);
 
         switch ((PackingTypeFlags) PackingType) {
             case PackingTypeFlags.Uncompressed: {
@@ -39,7 +39,7 @@ public class PBOEntry : IDisposable {
                 var memStream = new MemoryStream();
                 EntryData.CopyTo(memStream);
                 var compressedBytes = BisCompression.Compress(memStream.ToArray());
-                writer.Write((ulong) compressedBytes.Length);
+                writer.Write(BitConverter.GetBytes((long) compressedBytes.LongLength), 0, 4);
                 
                 EntryData.Close();
                 EntryData = new MemoryStream(compressedBytes);
