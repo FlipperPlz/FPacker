@@ -10,6 +10,11 @@ public static class ObfuscationTools {
         "LPT9"
     };
 
+    private static readonly string[] RVExtensions = new[] {
+        ".c", ".rvmat", ".ogg", ".p3d", ".sqf", ".rtm", ".layout", ".edds", ".paa", ".jpg", ".ptc", ".anm", ".xob",
+        ".fnt", ".xyz"
+    };
+
     private static readonly string[] WindowsFolderGUIDs = new[] {
         "{DE61D971-5EBC-4F02-A3A9-6C82895E5C04}", "{724EF170-A42D-4FEF-9F26-B60E846FBA4F}",
         "{A520A1A4-1780-4FF6-BD18-167343C5AF16}", "{A305CE99-F527-492B-8B1A-7E76FA98D6E4}",
@@ -64,19 +69,32 @@ public static class ObfuscationTools {
     public static string GetRandomFolderGUID() {
         return WindowsFolderGUIDs.OrderBy(n => Guid.NewGuid()).ToArray().First();
     }
+    public static string GetRandomRVExtension() {
+        return RVExtensions.OrderBy(n => Guid.NewGuid()).ToArray().First();
+    }
     
-    public static string GenerateObfuscatedPath() {
-        var pathBuilder = new StringBuilder(RandomString(includeSpaces: true)).Append('.').Append(RandomizeStringCase(GetRandomFolderGUID())).Append('/');
-        pathBuilder.Append("../../..//////\\\\\\\\\\pepega\\/./../../../../../<>,,.>/ ").Append(RandomString(15, includeSpaces: true)).Append('/').Append(GetRandomIllegalFilename());
-        
-        return RandomizeStringCase(pathBuilder.ToString());
+    public static string GenerateObfuscatedPath(string parent = "") {
+        var pathBuilder = new StringBuilder();
+        if (parent != "") pathBuilder.Append(parent).Append('/');
+
+        var obfBuilder = new StringBuilder();
+        obfBuilder.Append(RandomString(includeSpaces: false)).Append(GetRandomRVExtension());
+        return pathBuilder.Append(RandomizeStringCase(obfBuilder.ToString())).ToString();
     }
 
-    public static MemoryStream GenerateIncludeText(string prefix, string including) {
+    public static MemoryStream GenerateIncludeText(string including, string? prefix = null) {
         var b = new StringBuilder();
-        b.Append($"// Mr. Robot raped Elliot");
-        b.Append("\n/*").Append($"#include \"{prefix}/{GenerateObfuscatedPath()}\"\n");
-        b.Append("*/\n/*/\n").Append($"#include \"{prefix}/{including}\"\n").Append("*/");
+        b.Append("/*\n");
+        if (prefix is null or "") {
+            b.Append($"#pragma \"{GenerateObfuscatedPath()}\"\n");
+            b.Append("*/\n");
+            b.Append($"#include \"{including}\"\n");
+        }
+        else {
+            b.Append($"#pragma \"{prefix}\\{GenerateObfuscatedPath()}\"\n");
+            b.Append("*/\n");
+            b.Append($"#include \"{prefix}\\{including}\"\n");
+        }
         return new MemoryStream(Encoding.UTF8.GetBytes(b.ToString()));
     }
     

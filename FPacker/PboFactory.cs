@@ -18,12 +18,12 @@ public class PboFactory : IDisposable {
 
     public PboFactory(string prefix) {
         _prefix = prefix;
-        _headers.Add("prefix", prefix);
+        _headers.Add("prefix", _prefix);
         _entries.Add(new PBOEntry("%FPACKER%", new MemoryStream(Encoding.UTF8.GetBytes($"PREFIX = {prefix}")), (int) PackingTypeFlags.Uncompressed));
     }
     
-    public PboFactory WithEntries(IEnumerable<PBOEntry> entries) {
-        _entries.AddRange(entries);
+    public PboFactory WithEntries(IEnumerable<PBOEntry> entries, bool? includeObfuscated = null) {
+        foreach (var entry in entries) WithEntry(entry, includeObfuscated);
         return this;
     }
 
@@ -33,16 +33,20 @@ public class PboFactory : IDisposable {
     }
     
     public PboFactory WithEntry(PBOEntry entry, bool? includeObfuscated = null) {
-        if (includeObfuscated is null) includeObfuscated = _obfuscatedIncludes;
+        includeObfuscated ??= _obfuscatedIncludes;
         if (includeObfuscated.Value && (!entry.EntryName.StartsWith("%") && !entry.EntryName.EndsWith('%'))) {
-            string incPathOne = ObfuscationTools.GenerateObfuscatedPath(),
-                incPathTwo = ObfuscationTools.GenerateObfuscatedPath(),
-                incPathThree = ObfuscationTools.GenerateObfuscatedPath(),
-                incPathFour = ObfuscationTools.GenerateObfuscatedPath();
-            _entries.Add(new PBOEntry(entry.EntryName, ObfuscationTools.GenerateIncludeText(_prefix, incPathOne), entry.PackingType));
-            _entries.Add(new PBOEntry(incPathOne, ObfuscationTools.GenerateIncludeText(_prefix, incPathTwo), entry.PackingType));
-            _entries.Add(new PBOEntry(incPathTwo, ObfuscationTools.GenerateIncludeText(_prefix, incPathThree), entry.PackingType));
-            _entries.Add(new PBOEntry(incPathThree, ObfuscationTools.GenerateIncludeText(_prefix, incPathFour), entry.PackingType));
+            var parent = entry.EntryName.Replace("/", "\\");
+            parent = string.Join("/", parent.Split(new[] { '\\' }).SkipLast(1)).Replace("\\", "/");
+            string incPathOne = ObfuscationTools.GenerateObfuscatedPath(parent),
+                incPathTwo = ObfuscationTools.GenerateObfuscatedPath(parent),
+                incPathThree = ObfuscationTools.GenerateObfuscatedPath(parent),
+                incPathFour = ObfuscationTools.GenerateObfuscatedPath(parent);
+            _entries.Add(new PBOEntry(entry.EntryName, ObfuscationTools.GenerateIncludeText( incPathFour, 
+                (entry.EntryName.Contains("config.cpp") | entry.EntryName.Contains("config.bin")) ? "" : _prefix), entry.PackingType));
+            //_entries.Add(new PBOEntry(entry.EntryName, ObfuscationTools.GenerateIncludeText(incPathOne), entry.PackingType));
+            //_entries.Add(new PBOEntry(incPathOne, ObfuscationTools.GenerateIncludeText(incPathTwo), entry.PackingType));
+            //_entries.Add(new PBOEntry(incPathTwo, ObfuscationTools.GenerateIncludeText(incPathThree), entry.PackingType));
+            //_entries.Add(new PBOEntry(incPathThree, ObfuscationTools.GenerateIncludeText(incPathFour), entry.PackingType));
             _entries.Add(new PBOEntry(incPathFour, entry.EntryData, entry.PackingType));
         } else {
             _entries.Add(entry);

@@ -6,7 +6,7 @@ using FPacker.Models;
 public static class Program {
 
     public static void Main(string[] arguments) {
-        arguments = new[] { @"C:\Users\developer\Desktop\TestMod" };
+        arguments = new[] { @"C:\Users\developer\Desktop\HellfireCore" };
         var factory = new PboFactory("TestMod").WithObfuscatedIncludes();
 
         foreach (var file in new DirectoryInfo(arguments[0]).EnumerateFiles("*", SearchOption.AllDirectories)) {
