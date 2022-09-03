@@ -9,14 +9,14 @@ public enum PackingTypeFlags : int { Uncompressed = 0x00000000, Compressed = 0x4
 public class PBOEntry : IDisposable {
     public string EntryName { get; set; }
     public int PackingType { get; set; }
-    public Stream EntryData { get; set; }
+    public MemoryStream EntryData { get; set; }
     
     private ulong Offset { get; set; }
     private ulong OffsetLocation { get; set; }
 
     private bool _disposed;
     
-    public PBOEntry(string name, Stream entryData, int packingType) {
+    public PBOEntry(string name, MemoryStream entryData, int packingType) {
         EntryName = name;
         EntryData = entryData;
         PackingType = packingType;
@@ -36,12 +36,9 @@ public class PBOEntry : IDisposable {
                 break;
             }
             case PackingTypeFlags.Compressed: {
-                var memStream = new MemoryStream();
-                EntryData.CopyTo(memStream);
-                var compressedBytes = BisCompression.Compress(memStream.ToArray());
-                writer.Write(BitConverter.GetBytes(compressedBytes.Length), 0, 4);
                 
-                EntryData.Close();
+                var compressedBytes = BisCompression.Compress(EntryData.ToArray());
+                writer.Write(BitConverter.GetBytes(compressedBytes.Length), 0, 4);
                 EntryData = new MemoryStream(compressedBytes);
                 break;
             }
@@ -51,9 +48,7 @@ public class PBOEntry : IDisposable {
 
     public void WriteEntryData(BinaryWriter writer) {
         Offset = (ulong) writer.BaseStream.Position;
-        var data = new MemoryStream();
-        EntryData.CopyTo(data);
-        writer.Write(data.ToArray());
+        writer.Write(EntryData.ToArray());
         var jump = writer.BaseStream.Position;
         writer.BaseStream.Position = (long)OffsetLocation;
         writer.Write(BitConverter.GetBytes((long) Offset), 0, 4);

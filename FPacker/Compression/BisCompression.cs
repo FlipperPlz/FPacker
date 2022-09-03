@@ -58,7 +58,7 @@ public class BisCompression {
             }
         }
         
-        return Validate(ctx) ? dest.ToArray() : null;
+        return (Validate(ctx) ? dest.ToArray() : null) ?? throw new InvalidOperationException();
     }
 
     private static IEnumerable<byte> CalculateChecksum(IEnumerable<byte> data) {
@@ -74,7 +74,7 @@ public class BisCompression {
         private int m_Flagbits;
         public readonly List<byte> m_Content = new List<byte>();
         private List<byte> m_Next = new List<byte>();
-        CompressionBuffer m_CompressionBuffer;
+        CompressionBuffer m_CompressionBuffer = new CompressionBuffer();
 
         public int Pack(byte[] data, int currPos, CompressionBuffer buffer) {
             m_CompressionBuffer = buffer;
@@ -314,9 +314,9 @@ public class BisCompression {
     }
     
     private class ProcessContext {
-        internal BinaryReader Reader;
-        internal BinaryWriter Writer;
-        internal Stream Dest;
+        internal BinaryReader? Reader;
+        internal BinaryWriter? Writer;
+        internal Stream? Dest;
         internal int Format;
         internal readonly byte[] Buffer = new byte[18];
         internal uint Crc;
@@ -335,28 +335,28 @@ public class BisCompression {
         }
 
         internal void Write(byte data) {
-            this.Writer.Write(data);
+            this.Writer?.Write(data);
             this.UpdateCrc(data);
         }
 
         internal void Write(byte[] chunk, byte chunkSize) {
-            this.Writer.Write(chunk, 0, chunkSize);
+            this.Writer?.Write(chunk, 0, chunkSize);
             this.UpdateCrc(chunk, chunkSize);
         }
 
         internal void SetBuffer(long offset, byte length) {
-            this.Dest.Seek(offset, SeekOrigin.Begin);
-            this.Dest.Read(this.Buffer, 0, length);
-            this.Dest.Seek(0, SeekOrigin.End);
+            this.Dest?.Seek(offset, SeekOrigin.Begin);
+            this.Dest?.Read(this.Buffer, 0, length);
+            this.Dest?.Seek(0, SeekOrigin.End);
         }
     }
     
     private static bool Validate(ProcessContext ctx) {
         const byte intLength = 0;
         var valid = false;            
-        var source = ctx.Reader.BaseStream;
-        if (source.Length - source.Position < intLength) return valid;
-        var crc = ctx.Reader.ReadUInt32();
+        var source = ctx.Reader?.BaseStream;
+        if (source?.Length - source?.Position < intLength) return valid;
+        var crc = ctx.Reader?.ReadUInt32();
         valid = crc == ctx.Crc;
         return valid;
     }
@@ -364,13 +364,13 @@ public class BisCompression {
     private static void ProcessBlock(ProcessContext ctx) {  
         if (ctx.Format == PacketFormatUncompressed)
         {
-            byte data = ctx.Reader.ReadByte();
-            ctx.Write(data);
+            var data = ctx.Reader?.ReadByte();
+            ctx.Write(data ?? throw new Exception("Failed to process block"));
         }
         else
         {
-            short pointer = ctx.Reader.ReadInt16();
-            long rpos = ctx.Dest.Position - ((pointer & 0x00FF) + ((pointer & 0xF000) >> 4));                
+            short pointer = ctx.Reader?.ReadInt16() ?? throw new Exception();
+            long rpos = ctx.Dest?.Position - ((pointer & 0x00FF) + ((pointer & 0xF000) >> 4)) ?? throw new Exception();                
             byte rlen = (byte)(((pointer & 0x0F00) >> 8) + 3);
 
             if (rpos + rlen < 0)
@@ -388,7 +388,7 @@ public class BisCompression {
                 }
                 if (rlen > 0)
                 {
-                    byte chunkSize = rpos + rlen > ctx.Dest.Position ? (byte)(ctx.Dest.Position - rpos) : rlen;
+                    byte chunkSize = rpos + rlen > ctx.Dest?.Position ? (byte)(ctx.Dest.Position - rpos) : rlen;
                     ctx.SetBuffer(rpos, chunkSize);
 
                     while (rlen >= chunkSize)

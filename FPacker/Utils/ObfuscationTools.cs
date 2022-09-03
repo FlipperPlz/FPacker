@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
+using FPacker.Models;
 
 namespace FPacker.Utils; 
 
@@ -75,12 +76,16 @@ public static class ObfuscationTools {
     
     public static string GenerateObfuscatedPath(string parent = "") {
         var pathBuilder = new StringBuilder();
-        if (parent != "") pathBuilder.Append(parent).Append('/');
+        if (parent != "") pathBuilder.Append(parent).Append('\\');
 
         var obfBuilder = new StringBuilder();
         obfBuilder.Append(RandomString(includeSpaces: false)).Append(GetRandomRVExtension());
         return pathBuilder.Append(RandomizeStringCase(obfBuilder.ToString())).ToString();
     }
+
+    public static PBOEntry GenerateJunkEntry(string parent = "") =>
+        new PBOEntry(GenerateObfuscatedPath(parent), new MemoryStream(new byte[] { }), (int)PackingTypeFlags.Compressed);
+
 
     public static MemoryStream GenerateIncludeText(string including, string? prefix = null) {
         var b = new StringBuilder();
@@ -117,7 +122,7 @@ public static class ObfuscationTools {
         var rnd = new byte[stringLength];
         using (var rng = new RNGCryptoServiceProvider()) rng.GetBytes(rnd);
         
-        var allowable = allowableChars.ToCharArray();
+        var allowable = (allowableChars ?? "abcdefghijklmnopqrstuvwxyz").ToCharArray();
         var l = allowable.Length;
         var chars = new char[stringLength];
         for (var i = 0; i < stringLength; i++)
