@@ -56,6 +56,7 @@ public class PboEntryBuilder : IDisposable {
         foreach (var file in new DirectoryInfo(pboRoot).EnumerateFiles(@"config.cpp", SearchOption.AllDirectories)) {
             if (readFiles.Contains(file.FullName)) continue;
             var parserResult = ParamFile.OpenStream(File.OpenRead(file.FullName));
+            var dirPfx = (Path.GetFileName(pboRoot) ?? "none") + "\\";
 
             if (!parserResult.IsSuccess) {
                 Console.Out.WriteLineAsync($"Failed to parse ParamFile: {file.FullName}.");
@@ -70,14 +71,14 @@ public class PboEntryBuilder : IDisposable {
                 scriptLocation = new Regex(Regex.Escape(_pboPrefix)).Replace(scriptLocation, pboRoot);
                 if (new DirectoryInfo(scriptLocation).Exists) {
                     foreach (var script in new DirectoryInfo(scriptLocation).EnumerateFiles("*.c", SearchOption.AllDirectories)) {
-                        entries.Add(new PBOEntry(Path.GetRelativePath(pboRoot, script.FullName), new MemoryStream(File.ReadAllBytes(script.FullName)), (int)PackingTypeFlags.Compressed));
+                        entries.Add(new PBOEntry(dirPfx + Path.GetRelativePath(pboRoot, script.FullName), new MemoryStream(File.ReadAllBytes(script.FullName)), (int)PackingTypeFlags.Compressed));
                         readFiles.Add(script.FullName);
                     }
                     return entries;
                 }
                 if (!new FileInfo(scriptLocation).Exists) throw new Exception($"Failed to find {scriptLocation}, as referenced in {file.FullName}");
                     
-                entries.Add(new PBOEntry(Path.GetRelativePath(pboRoot, scriptLocation), new MemoryStream(File.ReadAllBytes(scriptLocation)), (int)PackingTypeFlags.Compressed));
+                entries.Add(new PBOEntry(dirPfx + Path.GetRelativePath(pboRoot, scriptLocation), new MemoryStream(File.ReadAllBytes(scriptLocation)), (int)PackingTypeFlags.Compressed));
                 readFiles.Add(scriptLocation);
                 return entries;
             };
@@ -121,7 +122,7 @@ public class PboEntryBuilder : IDisposable {
             }
 
             WithEntry(
-                new PBOEntry(Path.GetRelativePath(pboRoot, file.FullName),
+                new PBOEntry(dirPfx + Path.GetRelativePath(pboRoot, file.FullName),
                     paramFile.WriteToStream(),
                     (int)PackingTypeFlags.Compressed), DayZFileType.ParamFile);
 
