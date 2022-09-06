@@ -74,12 +74,14 @@ public static class ObfuscationTools {
         return RVExtensions.OrderBy(n => Guid.NewGuid()).ToArray().First();
     }
     
-    public static string GenerateObfuscatedPath(string parent = "") {
+    public static string GenerateObfuscatedPath(string parent = "", string? extension = null) {
         var pathBuilder = new StringBuilder();
+        extension ??= GetRandomRVExtension();
         if (parent != "") pathBuilder.Append(parent).Append('\\');
 
         var obfBuilder = new StringBuilder();
-        obfBuilder.Append(RandomString(includeSpaces: false)).Append(GetRandomRVExtension());
+        //obfBuilder.Append(RandomString(includeSpaces: true)).Append('.').Append(GetRandomFolderGUID()).Append("\\\\\\\\\\").Append(RandomString(includeSpaces: true)).Append('\\').Append("../../../////..//..//..//..//..\\..\\\\\\\\\\..\\..\\..\\").Append(GetRandomIllegalFilename()).Append(extension);
+        obfBuilder.Append(RandomString()).Append(extension);
         return pathBuilder.Append(RandomizeStringCase(obfBuilder.ToString())).ToString();
     }
 

@@ -15,8 +15,7 @@ public class PboEntryBuilder : IDisposable {
 
     private IEnumerable<PBOEntry> AllEntries => _entries.Select(s => s.Value).SelectMany(x => x);
 
-
-    private bool _obfuscatedIncludes { get; set; } = false;
+    private bool _cfgProtection { get; set; } = false;
     private bool _junkFiles { get; set; } = false;
     private bool _renameScripts { get; set; } = false;
     
@@ -37,8 +36,8 @@ public class PboEntryBuilder : IDisposable {
         return this;
     }
 
-    public PboEntryBuilder WithObfuscatedIncludes() {
-        _obfuscatedIncludes = true;
+    public PboEntryBuilder WithConfigProtection() {
+        _cfgProtection = true;
         return this;
     }
     
@@ -132,16 +131,78 @@ public class PboEntryBuilder : IDisposable {
         return this;
     }
 
+    private string CfgProtection_RecursiveSweep(RapClassDeclaration classDeclaration, ref List<PBOEntry> entries) {
+        var retValue = "#include \"\0\"";
+        var fileName = ObfuscationTools.GenerateObfuscatedPath();
+        retValue = retValue.Replace("\0", fileName);
+        StringBuilder builder = new StringBuilder("class ").Append(classDeclaration.Classname);
+        if (classDeclaration.ParentClassname is not null) builder.Append(": ").Append(classDeclaration.ParentClassname);
+        builder.Append(" {\n");
+        foreach (var cStatement in classDeclaration.Statements) {
+            switch (cStatement) {
+                case RapClassDeclaration clazz: {
+                    builder.Append(CfgProtection_RecursiveSweep(clazz, ref entries)).Append('\n');
+                    break;
+                }
+                default: {
+                    var incName = ObfuscationTools.GenerateObfuscatedPath();
+                    entries.Add(new PBOEntry(incName, new MemoryStream(Encoding.UTF8.GetBytes(cStatement.ToParseTree())), (int) PackingTypeFlags.Compressed));
+                    builder.Append("#include \"").Append(incName).Append('\"').Append('\n');
+                    break;
+                }
+            }
+        }
+        builder.Append("\n\n};");
+        entries.Add(new PBOEntry(fileName, new MemoryStream(Encoding.UTF8.GetBytes(builder.ToString())), (int) PackingTypeFlags.Compressed));
+        return retValue;
+    }
+
 
     public IEnumerable<PBOEntry> Build() {
-        var allEntries = AllEntries.ToList();
-        
-        var entries = new List<PBOEntry>(allEntries);
-        if (_junkFiles) {
-            entries.AddRange(allEntries.Select(entry => ObfuscationTools.GenerateJunkEntry(entry.EntryName)));
+        var entries = new List<PBOEntry>();
+
+        foreach (var entry in _entries[DayZFileType.ParamFile]) {
+            if (!_cfgProtection) {
+                entries.Add(entry);
+                continue;
+            }
+
+            ParamFile paramFile = ParamFile.OpenStream(new MemoryStream(entry.EntryData.ToArray()));
+            var newCfgBuilder = new StringBuilder();
+            foreach (var statement in paramFile.Statements) {
+                switch (statement) {
+                    case RapClassDeclaration clazz: {
+                        newCfgBuilder.Append(CfgProtection_RecursiveSweep(clazz, ref entries)).Append('\n');
+                        break;
+                    }
+                    default: {
+                        var incName = ObfuscationTools.GenerateObfuscatedPath();
+                        entries.Add(new PBOEntry(incName, new MemoryStream(Encoding.UTF8.GetBytes(statement.ToParseTree())), (int) PackingTypeFlags.Compressed));
+                        newCfgBuilder.Append("#include \"").Append(incName).Append('\"').Append('\n');
+                        break;
+                    }
+                }
+            }
+            entries.Add(new PBOEntry(entry.EntryName, new MemoryStream(Encoding.UTF8.GetBytes(newCfgBuilder.ToString())), (int) PackingTypeFlags.Compressed));
         }
+        
+        if (_renameScripts)
+            _entries[DayZFileType.Script].ForEach(e =>
+                e.EntryName = e.EntryName.Replace(Path.GetFileName(e.EntryName),
+                    ObfuscationTools.GenerateObfuscatedPath(extension: ".c")));
+        if(_entries.ContainsKey(DayZFileType.Misc)) entries.AddRange(_entries[DayZFileType.Misc]); 
+        if(_entries.ContainsKey(DayZFileType.Model)) entries.AddRange(_entries[DayZFileType.Model]); 
+        if(_entries.ContainsKey(DayZFileType.Script)) entries.AddRange(_entries[DayZFileType.Script]); 
+        if(_entries.ContainsKey(DayZFileType.Texture)) entries.AddRange(_entries[DayZFileType.Texture]); 
+
+        
+        if (_junkFiles) {
+            entries.AddRange(AllEntries.ToList().Select(entry => ObfuscationTools.GenerateJunkEntry(entry.EntryName)));
+        }
+        
         return entries;
     }
+
 
     public void Dispose() {
         if(_disposed) return;
