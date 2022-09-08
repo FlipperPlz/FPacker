@@ -19,7 +19,9 @@ public class PboEntryBuilder : IDisposable {
     private bool _cfgProtection { get; set; } = false;
     private bool _junkFiles { get; set; } = false;
     private bool _renameScripts { get; set; } = false;
+    private bool _binarizeCfgs { get; set; } = true;
     
+    private bool _directoryHasBeenMapped;
     private bool _disposed;
     
     public PboEntryBuilder(string pboPrefix) =>_pboPrefix = pboPrefix;
@@ -42,6 +44,11 @@ public class PboEntryBuilder : IDisposable {
         return this;
     }
     
+    public PboEntryBuilder WithoutBinarizedConfigs() {
+        _binarizeCfgs = false;
+        return this;
+    }
+    
     public PboEntryBuilder WithRelocatedConfigs() {
         _relocateConfigs = true;
         return this;
@@ -52,17 +59,17 @@ public class PboEntryBuilder : IDisposable {
         return this;
     }
 
-    public PboEntryBuilder RenameScripts() {
+    public PboEntryBuilder WithRenamedScripts() {
         _renameScripts = true;
         return this;
     }
 
     public PboEntryBuilder FromDirectory(string pboRoot) {
+        if (_directoryHasBeenMapped) throw new Exception("PboEntryBuilder::FromDirectory can only be called once!");
         var readFiles = new List<string>();
         foreach (var file in new DirectoryInfo(pboRoot).EnumerateFiles(@"config.cpp", SearchOption.AllDirectories)) {
             if (readFiles.Contains(file.FullName)) continue;
             var parserResult = ParamFile.OpenStream(File.OpenRead(file.FullName));
-            var dirPfx = (Path.GetFileName(pboRoot) ?? "none") + "\\";
 
             if (!parserResult.IsSuccess) {
                 Console.Out.WriteLineAsync($"Failed to parse ParamFile: {file.FullName}.");
@@ -77,14 +84,14 @@ public class PboEntryBuilder : IDisposable {
                 scriptLocation = new Regex(Regex.Escape(_pboPrefix)).Replace(scriptLocation, pboRoot);
                 if (new DirectoryInfo(scriptLocation).Exists) {
                     foreach (var script in new DirectoryInfo(scriptLocation).EnumerateFiles("*.c", SearchOption.AllDirectories)) {
-                        entries.Add(new PBOEntry(dirPfx + Path.GetRelativePath(pboRoot, script.FullName), new MemoryStream(File.ReadAllBytes(script.FullName)), (int)PackingTypeFlags.Compressed));
+                        entries.Add(new PBOEntry(Path.GetRelativePath(pboRoot, script.FullName), new MemoryStream(File.ReadAllBytes(script.FullName)), (int)PackingTypeFlags.Compressed));
                         readFiles.Add(script.FullName);
                     }
                     return entries;
                 }
                 if (!new FileInfo(scriptLocation).Exists) throw new Exception($"Failed to find {scriptLocation}, as referenced in {file.FullName}");
                     
-                entries.Add(new PBOEntry(dirPfx + Path.GetRelativePath(pboRoot, scriptLocation), new MemoryStream(File.ReadAllBytes(scriptLocation)), (int)PackingTypeFlags.Compressed));
+                entries.Add(new PBOEntry(Path.GetRelativePath(pboRoot, scriptLocation), new MemoryStream(File.ReadAllBytes(scriptLocation)), (int)PackingTypeFlags.Compressed));
                 readFiles.Add(scriptLocation);
                 return entries;
             };
@@ -112,8 +119,8 @@ public class PboEntryBuilder : IDisposable {
 
                                             foreach (var scriptPath in defineArray.ArrayValue.Entries
                                                          .Where(e => e is RapString).Cast<RapString>()) {
-                                                WithEntries(GatherScriptsInFolder.Invoke(scriptPath),
-                                                    DayZFileType.Script);
+                                                WithEntries(GatherScriptsInFolder.Invoke(scriptPath), DayZFileType.Script);
+                                                
                                             }
                                         }
 
@@ -128,12 +135,13 @@ public class PboEntryBuilder : IDisposable {
             }
 
             WithEntry(
-                new PBOEntry(dirPfx + Path.GetRelativePath(pboRoot, file.FullName),
+                new PBOEntry(Path.GetRelativePath(pboRoot, file.FullName),
                     paramFile.WriteToStream(),
                     (int)PackingTypeFlags.Compressed), DayZFileType.ParamFile);
 
             readFiles.Add(file.FullName);
         }
+        _directoryHasBeenMapped = true;
 
         return this;
     }
@@ -171,7 +179,17 @@ public class PboEntryBuilder : IDisposable {
         foreach (var entry in _entries[DayZFileType.ParamFile]) {
             entry.EntryName = entry.EntryName.Replace("config.bin", "config.cpp");
             if (_relocateConfigs) entry.EntryName = ObfuscationTools.GenerateObfuscatedPath() + "\\config.cpp";
+            ParamFile paramFile = ParamFile.OpenStream(new MemoryStream(entry.EntryData.ToArray()));
+
             if (!_cfgProtection) {
+                if (_binarizeCfgs) {
+                    entry.EntryName = entry.EntryName.Replace("config.cpp", "config.bin");
+                    entry.EntryData = paramFile.WriteToStream();
+                    entries.Add(entry);
+                    continue;
+                }
+
+                entry.EntryData = paramFile.WriteToStream(false);
                 entries.Add(entry);
                 continue;
             }
@@ -179,7 +197,6 @@ public class PboEntryBuilder : IDisposable {
             var parentFolder = entry.EntryName.Replace("config.cpp", string.Empty);
             parentFolder = parentFolder.Remove(parentFolder.Length - 1);
             
-            ParamFile paramFile = ParamFile.OpenStream(new MemoryStream(entry.EntryData.ToArray()));
             var newCfgBuilder = new StringBuilder();
             foreach (var statement in paramFile.Statements) {
                 switch (statement) {
