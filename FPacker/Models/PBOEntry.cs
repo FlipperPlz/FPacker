@@ -1,5 +1,5 @@
-﻿using FPacker.Compression;
-using FPacker.IO;
+﻿using DZConfigTools.Core.IO;
+using FPacker.Compression;
 
 namespace FPacker.Models;
 

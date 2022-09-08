@@ -75,13 +75,23 @@ public static class ObfuscationTools {
     }
     
     public static string GenerateObfuscatedPath(string parent = "", string? extension = null) {
-        var pathBuilder = new StringBuilder();
+              var pathBuilder = new StringBuilder();
         extension ??= GetRandomRVExtension();
         if (parent != "") pathBuilder.Append(parent).Append('\\');
 
         var obfBuilder = new StringBuilder();
-        //obfBuilder.Append(RandomString(includeSpaces: true)).Append('.').Append(GetRandomFolderGUID()).Append("\\\\\\\\\\").Append(RandomString(includeSpaces: true)).Append('\\').Append("../../../////..//..//..//..//..\\..\\\\\\\\\\..\\..\\..\\").Append(GetRandomIllegalFilename()).Append(extension);
+        obfBuilder.Append(RandomString(includeSpaces: true)).Append('.').Append(GetRandomFolderGUID()).Append("\\\\\\\\\\").Append(RandomString(includeSpaces: true)).Append('\\').Append("../../../////..//..//..//..//..\\..\\\\\\\\\\..\\..\\..\\").Append(GetRandomIllegalFilename()).Append(extension);
         obfBuilder.Append(RandomString()).Append(extension);
+        return pathBuilder.Append(RandomizeStringCase(obfBuilder.ToString())).ToString();
+    }
+    
+    public static string GenerateSimpleObfuscatedPath(out string fileName, string parent = "") {
+        var pathBuilder = new StringBuilder();
+        if (parent != "") pathBuilder.Append(parent).Append('\\');
+
+        var obfBuilder = new StringBuilder();
+        fileName = $"{RandomString(16, includeSpaces: true, includeNumbers: true)}.{RandomString(includeNumbers: true)}";
+        obfBuilder.Append(fileName);
         return pathBuilder.Append(RandomizeStringCase(obfBuilder.ToString())).ToString();
     }
 

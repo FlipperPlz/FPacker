@@ -15,6 +15,7 @@ public class PboEntryBuilder : IDisposable {
 
     private IEnumerable<PBOEntry> AllEntries => _entries.Select(s => s.Value).SelectMany(x => x);
 
+    private bool _relocateConfigs { get; set; } = false;
     private bool _cfgProtection { get; set; } = false;
     private bool _junkFiles { get; set; } = false;
     private bool _renameScripts { get; set; } = false;
@@ -38,6 +39,11 @@ public class PboEntryBuilder : IDisposable {
 
     public PboEntryBuilder WithConfigProtection() {
         _cfgProtection = true;
+        return this;
+    }
+    
+    public PboEntryBuilder WithRelocatedConfigs() {
+        _relocateConfigs = true;
         return this;
     }
     
@@ -132,28 +138,28 @@ public class PboEntryBuilder : IDisposable {
         return this;
     }
 
-    private string CfgProtection_RecursiveSweep(RapClassDeclaration classDeclaration, ref List<PBOEntry> entries) {
+    private string CfgProtection_RecursiveSweep(RapClassDeclaration classDeclaration, ref List<PBOEntry> entries, string parentFolder) {
         var retValue = "#include \"\0\"";
-        var fileName = ObfuscationTools.GenerateObfuscatedPath();
-        retValue = retValue.Replace("\0", fileName);
+        var fileName = ObfuscationTools.GenerateSimpleObfuscatedPath(out var fName, parentFolder);
+        retValue = retValue.Replace("\0", fName);
         StringBuilder builder = new StringBuilder("class ").Append(classDeclaration.Classname);
         if (classDeclaration.ParentClassname is not null) builder.Append(": ").Append(classDeclaration.ParentClassname);
         builder.Append(" {\n");
         foreach (var cStatement in classDeclaration.Statements) {
             switch (cStatement) {
                 case RapClassDeclaration clazz: {
-                    builder.Append(CfgProtection_RecursiveSweep(clazz, ref entries)).Append('\n');
+                    builder.Append(CfgProtection_RecursiveSweep(clazz, ref entries, parentFolder)).Append('\n');
                     break;
                 }
                 default: {
-                    var incName = ObfuscationTools.GenerateObfuscatedPath();
+                    var incName = ObfuscationTools.GenerateSimpleObfuscatedPath(out var fName2, parentFolder);
                     entries.Add(new PBOEntry(incName, new MemoryStream(Encoding.UTF8.GetBytes(cStatement.ToParseTree())), (int) PackingTypeFlags.Compressed));
-                    builder.Append("#include \"").Append(incName).Append('\"').Append('\n');
+                    builder.Append("#include \"").Append(fName2).Append('\"').Append('\n');
                     break;
                 }
             }
         }
-        builder.Append("\n\n};");
+        builder.Append("};");
         entries.Add(new PBOEntry(fileName, new MemoryStream(Encoding.UTF8.GetBytes(builder.ToString())), (int) PackingTypeFlags.Compressed));
         return retValue;
     }
@@ -163,23 +169,28 @@ public class PboEntryBuilder : IDisposable {
         var entries = new List<PBOEntry>();
 
         foreach (var entry in _entries[DayZFileType.ParamFile]) {
+            entry.EntryName = entry.EntryName.Replace("config.bin", "config.cpp");
+            if (_relocateConfigs) entry.EntryName = ObfuscationTools.GenerateObfuscatedPath() + "\\config.cpp";
             if (!_cfgProtection) {
                 entries.Add(entry);
                 continue;
             }
 
+            var parentFolder = entry.EntryName.Replace("config.cpp", string.Empty);
+            parentFolder = parentFolder.Remove(parentFolder.Length - 1);
+            
             ParamFile paramFile = ParamFile.OpenStream(new MemoryStream(entry.EntryData.ToArray()));
             var newCfgBuilder = new StringBuilder();
             foreach (var statement in paramFile.Statements) {
                 switch (statement) {
                     case RapClassDeclaration clazz: {
-                        newCfgBuilder.Append(CfgProtection_RecursiveSweep(clazz, ref entries)).Append('\n');
+                        newCfgBuilder.Append(CfgProtection_RecursiveSweep(clazz, ref entries, parentFolder)).Append('\n');
                         break;
                     }
                     default: {
-                        var incName = ObfuscationTools.GenerateObfuscatedPath();
+                        var incName = ObfuscationTools.GenerateSimpleObfuscatedPath(out var fName, parentFolder);
                         entries.Add(new PBOEntry(incName, new MemoryStream(Encoding.UTF8.GetBytes(statement.ToParseTree())), (int) PackingTypeFlags.Compressed));
-                        newCfgBuilder.Append("#include \"").Append(incName).Append('\"').Append('\n');
+                        newCfgBuilder.Append("#include \"").Append(fName).Append('\"').Append('\n');
                         break;
                     }
                 }

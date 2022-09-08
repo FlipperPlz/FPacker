@@ -1,6 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
-using FPacker.IO;
+using DZConfigTools.Core.IO;
 using FPacker.Models;
 using FPacker.Utils;
 
