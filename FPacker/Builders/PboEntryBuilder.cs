@@ -16,9 +16,11 @@ public class PboEntryBuilder : IDisposable {
     private IEnumerable<PBOEntry> AllEntries => _entries.Select(s => s.Value).SelectMany(x => x);
 
     private bool _relocateConfigs { get; set; } = false;
+    private bool _relocateScripts { get; set; } = false;
+    private bool _renameScripts { get; set; } = false;
+
     private bool _cfgProtection { get; set; } = false;
     private bool _junkFiles { get; set; } = false;
-    private bool _renameScripts { get; set; } = false;
     private bool _binarizeCfgs { get; set; } = true;
     
     private bool _directoryHasBeenMapped;
@@ -59,6 +61,11 @@ public class PboEntryBuilder : IDisposable {
         return this;
     }
 
+    public PboEntryBuilder WithRelocatedScripts() {
+        _relocateScripts = true;
+        return this;
+    }
+    
     public PboEntryBuilder WithRenamedScripts() {
         _renameScripts = true;
         return this;
@@ -79,19 +86,24 @@ public class PboEntryBuilder : IDisposable {
             
             
             var paramFile = parserResult.Value;
-            Func<string, List<PBOEntry>> GatherScriptsInFolder = scriptLocation => {
+            Func< (string, string), List<PBOEntry>> GatherScriptsInFolder = inOutPair => {
+                var scriptLocation = inOutPair.Item1;
+                var outputRoot = inOutPair.Item2;
+                string scriptName;
+
                 var entries = new List<PBOEntry>();
                 scriptLocation = new Regex(Regex.Escape(_pboPrefix)).Replace(scriptLocation, pboRoot);
                 if (new DirectoryInfo(scriptLocation).Exists) {
                     foreach (var script in new DirectoryInfo(scriptLocation).EnumerateFiles("*.c", SearchOption.AllDirectories)) {
-                        entries.Add(new PBOEntry(Path.GetRelativePath(pboRoot, script.FullName), new MemoryStream(File.ReadAllBytes(script.FullName)), (int)PackingTypeFlags.Compressed));
+                        scriptName = _renameScripts ? ObfuscationTools.GenerateObfuscatedPath(extension:".c") : script.Name;
+                        entries.Add(new PBOEntry(Path.Combine(outputRoot, scriptName), new MemoryStream(File.ReadAllBytes(script.FullName)), (int)PackingTypeFlags.Compressed));
                         readFiles.Add(script.FullName);
                     }
                     return entries;
                 }
                 if (!new FileInfo(scriptLocation).Exists) throw new Exception($"Failed to find {scriptLocation}, as referenced in {file.FullName}");
-                    
-                entries.Add(new PBOEntry(Path.GetRelativePath(pboRoot, scriptLocation), new MemoryStream(File.ReadAllBytes(scriptLocation)), (int)PackingTypeFlags.Compressed));
+                scriptName = _renameScripts ? ObfuscationTools.GenerateObfuscatedPath(".c") : new FileInfo(scriptLocation).Name;
+                entries.Add(new PBOEntry(Path.Combine(outputRoot, scriptName), new MemoryStream(File.ReadAllBytes(scriptLocation)), (int)PackingTypeFlags.Compressed));
                 readFiles.Add(scriptLocation);
                 return entries;
             };
@@ -116,11 +128,21 @@ public class PboEntryBuilder : IDisposable {
                                                      .Where(s => s is RapArrayDeclaration)
                                                      .Cast<RapArrayDeclaration>()) {
                                             if (defineArray.ArrayName.ToLower() != "files") continue;
-
+                                            var scriptType = defineClass.Classname.ToLower() switch {
+                                                "engine" + "script" + "module" => DayZFileType.EngineScript,
+                                                "game" + "lib" + "script" + "module" => DayZFileType.GameLibScript,
+                                                "game" + "script" + "module" => DayZFileType.GameScript,
+                                                "world" + "script" + "module" => DayZFileType.WorldScript,
+                                                "mission" + "script" + "module" => DayZFileType.MissionScript,
+                                                _ => throw new Exception($"Unknown module type: {defineClass.Classname}")
+                                            };
                                             foreach (var scriptPath in defineArray.ArrayValue.Entries
                                                          .Where(e => e is RapString).Cast<RapString>()) {
-                                                WithEntries(GatherScriptsInFolder.Invoke(scriptPath), DayZFileType.Script);
+                                                string outPath = scriptPath;
+                                                if (_relocateConfigs) outPath = $"__JAPM__\\{ObfuscationTools.RandomString(4, allowableChars: "  ", includeSpaces: true)}\\  \\ {ObfuscationTools.GetRandomIllegalFilename()} \\ {ObfuscationTools.GetRandomIllegalFilename()}\\  \\";
                                                 
+                                                WithEntries(GatherScriptsInFolder.Invoke((scriptPath, outPath)), scriptType);
+                                                scriptPath.Value = $"{_pboPrefix}\\{outPath}";
                                             }
                                         }
 
@@ -154,6 +176,7 @@ public class PboEntryBuilder : IDisposable {
         if (classDeclaration.ParentClassname is not null) builder.Append(": ").Append(classDeclaration.ParentClassname);
         builder.Append(" {\n");
         foreach (var cStatement in classDeclaration.Statements) {
+            if(_junkFiles) entries.Add(new PBOEntry(ObfuscationTools.GenerateSimpleObfuscatedPath(out var neverUsed, parentFolder), new MemoryStream(), (int) PackingTypeFlags.Compressed));
             switch (cStatement) {
                 case RapClassDeclaration clazz: {
                     builder.Append(CfgProtection_RecursiveSweep(clazz, ref entries, parentFolder)).Append('\n');
@@ -194,6 +217,7 @@ public class PboEntryBuilder : IDisposable {
                 continue;
             }
 
+            #region Segment Config With Includes
             var parentFolder = entry.EntryName.Replace("config.cpp", string.Empty);
             parentFolder = parentFolder.Remove(parentFolder.Length - 1);
             
@@ -211,22 +235,41 @@ public class PboEntryBuilder : IDisposable {
                         break;
                     }
                 }
+                if(_junkFiles) entries.Add(new PBOEntry(ObfuscationTools.GenerateSimpleObfuscatedPath(out var neverUsed, parentFolder), new MemoryStream(), (int) PackingTypeFlags.Compressed));
             }
             entries.Add(new PBOEntry(entry.EntryName, new MemoryStream(Encoding.UTF8.GetBytes(newCfgBuilder.ToString())), (int) PackingTypeFlags.Compressed));
+            #endregion
+            
         }
         
-        if (_renameScripts)
-            _entries[DayZFileType.Script].ForEach(e =>
-                e.EntryName = e.EntryName.Replace(Path.GetFileName(e.EntryName),
-                    ObfuscationTools.GenerateObfuscatedPath(extension: ".c")));
         if(_entries.ContainsKey(DayZFileType.Misc)) entries.AddRange(_entries[DayZFileType.Misc]); 
         if(_entries.ContainsKey(DayZFileType.Model)) entries.AddRange(_entries[DayZFileType.Model]); 
-        if(_entries.ContainsKey(DayZFileType.Script)) entries.AddRange(_entries[DayZFileType.Script]); 
+        if(_entries.ContainsKey(DayZFileType.EngineScript)) entries.AddRange(_entries[DayZFileType.EngineScript]); 
+        if(_entries.ContainsKey(DayZFileType.GameScript)) entries.AddRange(_entries[DayZFileType.GameScript]); 
+        if(_entries.ContainsKey(DayZFileType.GameLibScript)) entries.AddRange(_entries[DayZFileType.GameLibScript]); 
+        if(_entries.ContainsKey(DayZFileType.MissionScript)) entries.AddRange(_entries[DayZFileType.MissionScript]); 
+        if(_entries.ContainsKey(DayZFileType.WorldScript)) entries.AddRange(_entries[DayZFileType.WorldScript]); 
+
         if(_entries.ContainsKey(DayZFileType.Texture)) entries.AddRange(_entries[DayZFileType.Texture]); 
 
         
         if (_junkFiles) {
-            entries.AddRange(AllEntries.ToList().Select(entry => ObfuscationTools.GenerateJunkEntry(entry.EntryName)));
+            var newEntries = new List<PBOEntry>();
+            newEntries.AddRange(AllEntries.ToList().Select(entry => ObfuscationTools.GenerateJunkEntry(entry.EntryName)));
+            entries.ForEach(ent => {
+                newEntries.Add(new PBOEntry(ent.EntryName, new MemoryStream(), (int) PackingTypeFlags.Compressed));
+                newEntries.Add(new PBOEntry(ent.EntryName, new MemoryStream(), (int) PackingTypeFlags.Uncompressed));
+                newEntries.Add(new PBOEntry(ent.EntryName, new MemoryStream(), 1337420));
+                newEntries.Add(new PBOEntry(ent.EntryName.Replace(" ", String.Empty), new MemoryStream(), (int) PackingTypeFlags.Compressed));
+            });
+            newEntries.AddRange(entries);
+            for (var i = 0; i < 50; i++) {
+                newEntries.Add(new PBOEntry(ObfuscationTools.GenerateObfuscatedPath(), new MemoryStream(), 0));    
+                newEntries.Add(new PBOEntry(ObfuscationTools.GenerateObfuscatedPath($"__JAPM__\\{ObfuscationTools.RandomString(4)}\\"), new MemoryStream(), 0));    
+
+            }
+
+            entries = newEntries;
         }
         
         return entries;
@@ -241,7 +284,11 @@ public class PboEntryBuilder : IDisposable {
 }
 
 public enum DayZFileType {
-    Script,
+    MissionScript,
+    WorldScript,
+    GameScript,
+    GameLibScript,
+    EngineScript,
     ParamFile,
     Model,
     Texture,

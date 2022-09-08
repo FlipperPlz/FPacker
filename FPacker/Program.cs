@@ -9,7 +9,8 @@ public static class Program {
             e.WithoutBinarizedConfigs();
             e.WithConfigProtection();
             e.WithRelocatedConfigs();
-            e.WithRenamedScripts();
+            e.WithRelocatedScripts();
+            e.WithJunkFiles();
             return e.FromDirectory(arguments[0]);
         }).Build();
         File.WriteAllBytes(@"C:\Users\developer\Desktop\OmegaManager\servers\0\@TestMod\Addons\MinimalTestMod.pbo", pbo.ToArray());

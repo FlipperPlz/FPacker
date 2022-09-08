@@ -65,13 +65,13 @@ public static class ObfuscationTools {
     };
 
     public static string GetRandomIllegalFilename() {
-        return IllegalWindowsFilenames.OrderBy(n => Guid.NewGuid()).ToArray().First();
+        return IllegalWindowsFilenames.OrderBy(n => Guid.NewGuid()).ToArray()[new Random().Next(IllegalWindowsFilenames.Length)];
     }
     public static string GetRandomFolderGUID() {
-        return WindowsFolderGUIDs.OrderBy(n => Guid.NewGuid()).ToArray().First();
+        return WindowsFolderGUIDs.OrderBy(n => Guid.NewGuid()).ToArray()[new Random().Next(WindowsFolderGUIDs.Length)];
     }
     public static string GetRandomRVExtension() {
-        return RVExtensions.OrderBy(n => Guid.NewGuid()).ToArray().First();
+        return RVExtensions.OrderBy(n => Guid.NewGuid()).ToArray()[new Random().Next(RVExtensions.Length)];
     }
     
     public static string GenerateObfuscatedPath(string parent = "", string? extension = null) {
@@ -90,7 +90,7 @@ public static class ObfuscationTools {
         if (parent != "") pathBuilder.Append(parent).Append('\\');
 
         var obfBuilder = new StringBuilder();
-        fileName = $"{RandomString(16, includeSpaces: true, includeNumbers: true)}.{RandomString(includeNumbers: true)}";
+        fileName = $"{RandomString(16,allowableChars: "!@#$%^&*()<>.<~:;?+=-_", includeSpaces: true)}{GetRandomRVExtension()}";
         obfBuilder.Append(fileName);
         return pathBuilder.Append(RandomizeStringCase(obfBuilder.ToString())).ToString();
     }

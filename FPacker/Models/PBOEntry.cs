@@ -42,7 +42,9 @@ public class PBOEntry : IDisposable {
                 EntryData = new MemoryStream(compressedBytes);
                 break;
             }
-            default: throw new NotSupportedException();
+            default: 
+                writer.Write(BitConverter.GetBytes(EntryData.Length), 0, 4);
+                break;
         }
     }
 
