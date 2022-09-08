@@ -10,6 +10,7 @@ public static class Program {
             e.WithConfigProtection();
             e.WithRelocatedConfigs();
             e.WithRelocatedScripts();
+            e.WithRenamedScripts();
             e.WithJunkFiles();
             return e.FromDirectory(arguments[0]);
         }).Build();

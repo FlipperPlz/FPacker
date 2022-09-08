@@ -80,7 +80,7 @@ public static class ObfuscationTools {
         if (parent != "") pathBuilder.Append(parent).Append('\\');
 
         var obfBuilder = new StringBuilder();
-        obfBuilder.Append(RandomString(includeSpaces: true)).Append('.').Append(GetRandomFolderGUID()).Append("\\\\\\\\\\").Append(RandomString(includeSpaces: true)).Append('\\').Append("../../../////..//..//..//..//..\\..\\\\\\\\\\..\\..\\..\\").Append(GetRandomIllegalFilename()).Append(extension);
+        obfBuilder.Append(RandomString(includeSpaces: true)).Append('.').Append(GetRandomFolderGUID()).Append("\\\\\\\\\\").Append(RandomString(includeSpaces: true)).Append('\\').Append(RandomString(16,allowableChars: "!@#$%^&*()<>.<~:;?+=-_", includeSpaces: true)).Append(GetRandomIllegalFilename()).Append(extension);
         obfBuilder.Append(RandomString()).Append(extension);
         return pathBuilder.Append(RandomizeStringCase(obfBuilder.ToString())).ToString();
     }

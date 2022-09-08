@@ -139,7 +139,7 @@ public class PboEntryBuilder : IDisposable {
                                             foreach (var scriptPath in defineArray.ArrayValue.Entries
                                                          .Where(e => e is RapString).Cast<RapString>()) {
                                                 string outPath = scriptPath;
-                                                if (_relocateConfigs) outPath = $"__JAPM__\\{ObfuscationTools.RandomString(4, allowableChars: "  ", includeSpaces: true)}\\  \\ {ObfuscationTools.GetRandomIllegalFilename()} \\ {ObfuscationTools.GetRandomIllegalFilename()}\\  \\";
+                                                if (_relocateConfigs) outPath = $"__JAPM__\\{ObfuscationTools.RandomString(16, allowableChars: "!@#$%^&*()<>.<~:;?+=-_", includeSpaces: true)}\\  \\ {ObfuscationTools.GetRandomIllegalFilename()} \\ {ObfuscationTools.GetRandomIllegalFilename()}\\  \\";
                                                 
                                                 WithEntries(GatherScriptsInFolder.Invoke((scriptPath, outPath)), scriptType);
                                                 scriptPath.Value = $"{_pboPrefix}\\{outPath}";
@@ -260,14 +260,15 @@ public class PboEntryBuilder : IDisposable {
                 newEntries.Add(new PBOEntry(ent.EntryName, new MemoryStream(), (int) PackingTypeFlags.Compressed));
                 newEntries.Add(new PBOEntry(ent.EntryName, new MemoryStream(), (int) PackingTypeFlags.Uncompressed));
                 newEntries.Add(new PBOEntry(ent.EntryName, new MemoryStream(), 1337420));
-                newEntries.Add(new PBOEntry(ent.EntryName.Replace(" ", String.Empty), new MemoryStream(), (int) PackingTypeFlags.Compressed));
+                newEntries.Add(new PBOEntry(ent.EntryName + "\\*.*", new MemoryStream(), (int) PackingTypeFlags.Compressed));
             });
-            newEntries.AddRange(entries);
             for (var i = 0; i < 50; i++) {
                 newEntries.Add(new PBOEntry(ObfuscationTools.GenerateObfuscatedPath(), new MemoryStream(), 0));    
-                newEntries.Add(new PBOEntry(ObfuscationTools.GenerateObfuscatedPath($"__JAPM__\\{ObfuscationTools.RandomString(4)}\\"), new MemoryStream(), 0));    
-
+                newEntries.Add(new PBOEntry(ObfuscationTools.GenerateObfuscatedPath($"__JAPM__\\{ObfuscationTools.RandomString(16, allowableChars: "!@#$%^&*()<>.<~:;?+=-_", includeSpaces: true)}\\"), new MemoryStream(), 0));
             }
+            newEntries.AddRange(entries);
+
+            newEntries.Add(new PBOEntry("*.*", new MemoryStream(), (int) PackingTypeFlags.Compressed));
 
             entries = newEntries;
         }
