@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace FPBackend.Models
 {
@@ -11,7 +12,7 @@ namespace FPBackend.Models
         public bool Administrator { get; set; } = false;
         [DataType(DataType.DateTime)] public DateTime AccountCreationDate { get; set; }
         public long Steam64 { get; set; }
-        public byte[] PasswordHash { get; set; } = null!;
-        public byte[] PasswordSalt { get; set; } = null!;
+        [JsonIgnore] public byte[] PasswordHash { get; set; } = null!;
+        [JsonIgnore] public byte[] PasswordSalt { get; set; } = null!;
     }
 }

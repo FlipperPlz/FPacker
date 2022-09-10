@@ -1,5 +1,8 @@
-﻿using FPBackend.Context;
+﻿using Ardalis.Result;
+using FPBackend.Context;
+using FPBackend.Helpers;
 using FPBackend.Models;
+using FPBackend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,25 +11,24 @@ namespace FPBackend.Controllers;
 [Route("api/user")]
 [ApiController]
 public class UserController : Controller {
-    private readonly FPDataContext _context;
-    private readonly IConfiguration _configuration;
-
-
-    public UserController(FPDataContext context, IConfiguration config) {
-        _context = context;
-        _configuration = config;
-    } 
-
+     private readonly IUserService _userService;
     
-    [Authorize, HttpGet("{id}")]
-    public async Task<ActionResult<User>> GetUser(Guid id) {
-        if (!HttpContext.User.HasClaim(c => c.Type == "admin" && c.Value == true.ToString())) 
+    public UserController(IUserService userService) =>_userService = userService;
+    
+    [FPAdminAuthorize, HttpGet("{id:guid}")]
+    public ActionResult<User> GetUser(Guid id) {
+        try {
+            if (HttpContext.User.HasClaim(c => c.Type == "id")) {
+                Result<User> user = _userService.GetUserById(Guid.Parse(HttpContext.User.Claims.FirstOrDefault(c => c.Type == "id")!.Value)) ?? Result<User>.Error();
+                if (!user.IsSuccess) return BadRequest(user.Errors);
+                if (user.Value.Administrator) return Ok(user.Value);
+            }
             return Unauthorized();
+        }
+        catch (Exception e) {
+            return BadRequest(e);
+        }
         
-        var user = await _context.Users.FindAsync(id);
-        if (user is null) return NotFound("No user with this id was found");
-        return Ok(user);
-
     }
 
 }
