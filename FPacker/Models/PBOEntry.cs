@@ -21,7 +21,12 @@ public class PBOEntry : IDisposable {
         EntryData = entryData;
         PackingType = packingType;
     }
-
+    public PBOEntry(string name, byte[] entryData, int packingType)
+    {
+        EntryName = name;
+        EntryData = new MemoryStream(entryData);
+        PackingType = packingType;
+    }
     public void WriteMetaData(BinaryWriter writer) {
         writer.WriteAsciiZ(EntryName);
         writer.Write(BitConverter.GetBytes(PackingType), 0, 4);
