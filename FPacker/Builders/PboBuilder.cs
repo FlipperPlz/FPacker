@@ -32,8 +32,9 @@ public class PboBuilder : IDisposable {
         return this;
     }
 
-    public PboBuilder WithEntryBuilder(Func<PboEntryBuilder, PboEntryBuilder> entryBuilder) {
-        _entryFactory = entryBuilder.Invoke(_entryFactory ?? new PboEntryBuilder(_pboPrefix));
+    public PboBuilder WithEntryBuilder(Action<PboEntryBuilder> entryBuilder) {
+        _entryFactory ??= new PboEntryBuilder(_pboPrefix);
+        entryBuilder.Invoke(_entryFactory);
         return this;
     }
 

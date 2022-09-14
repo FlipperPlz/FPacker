@@ -11,7 +11,7 @@ public static class Program {
             e.WithConfigProtection();
             e.WithoutBinarizedConfigs();
             e.WithJunkFiles();
-            return e.FromDirectory(arguments[0]);
+            e.FromDirectory(arguments[0]);
         }).Build();
         File.WriteAllBytes(@"C:\Users\developer\Desktop\OmegaManager\servers\0\@TestMod\Addons\TestMod.pbo", pbo.ToArray());
     }
