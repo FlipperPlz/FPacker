@@ -28,11 +28,29 @@ public class UserService : IUserService {
     }
 
     public Result<JwtResponseDTO> Authenticate(UserCredentialsDTO model) {
-        var user = GetUserByEmail(model.Email);
-        if(!user.IsSuccess) return Result.Error(user.Errors.FirstOrDefault("An unknown error occured."));
-        if (!VerifyPasswordHash(model.Password, user.Value.PasswordHash, user.Value.PasswordSalt)) return Result<JwtResponseDTO>.Error("Invalid Credentials");
-        var token = GenerateJSONWebToken(user.Value);
-        return Result.Success(new JwtResponseDTO(token.Item2, token.Item1));
+        var userResult = GetUserByEmail(model.Email);
+        if(!userResult.IsSuccess) return Result.Error(userResult.Errors.FirstOrDefault("An unknown error occured."));
+        var user = userResult.Value;
+        if (!VerifyPasswordHash(model.Password, user.PasswordHash, user.PasswordSalt)) return Result<JwtResponseDTO>.Error("Invalid Credentials");
+        if (user.AuthorizationToken is { } cachedToken) {
+            if (user.AuthorizationTokenExpiration is { } tokenExpiration) {
+                if (DateTime.Compare(DateTime.Now, tokenExpiration) < 0) 
+                    return Result.Success(new JwtResponseDTO(cachedToken, tokenExpiration));
+                
+                goto CreateToken;
+            }
+            ValidateToken: {
+                if (ValidateJSONWebToken(cachedToken, out var nullableStoredTokenExpiration)) {
+                    if(nullableStoredTokenExpiration is not { } storedTokenExpiration) goto CreateToken;
+                    return Result.Success(new JwtResponseDTO(cachedToken, storedTokenExpiration ));
+                }
+            }
+        }
+        
+        CreateToken: {
+            var (expiration, token) = GenerateJSONWebToken(user);
+            return Result.Success(new JwtResponseDTO(token, expiration));
+        }
     }
 
     public async Task<Result<User>> CreateUserAsync(UserRegistrationDTO model, CancellationToken cancellationToken = default) {
@@ -74,6 +92,32 @@ public class UserService : IUserService {
         return (hmac.Key, hmac.ComputeHash(Encoding.UTF8.GetBytes(password)));
     }
 
+    private bool ValidateJSONWebToken(string token, out DateTime? expirationDate) {
+        try
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]);
+            tokenHandler.ValidateToken(token, new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ClockSkew = TimeSpan.Zero
+            }, out var validatedToken);
+            expirationDate = validatedToken.ValidTo;
+            return true;
+        }
+        catch
+        {
+            // do nothing if jwt validation fails
+            // account is not attached to context so request won't have access to secure routes
+        }
+
+        expirationDate = null;
+        return false;
+    }
+    
     private (DateTime, string) GenerateJSONWebToken(User userInfo, int tokenLifetimeMinutes = 120) {    
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));    
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha512Signature);

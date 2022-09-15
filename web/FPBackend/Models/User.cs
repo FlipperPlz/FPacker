@@ -14,5 +14,7 @@ namespace FPBackend.Models
         public long Steam64 { get; set; }
         [JsonIgnore] public byte[] PasswordHash { get; set; } = null!;
         [JsonIgnore] public byte[] PasswordSalt { get; set; } = null!;
+        [JsonIgnore] public string? AuthorizationToken { get; set; }
+        [JsonIgnore] public DateTime? AuthorizationTokenExpiration { get; set; }
     }
 }
