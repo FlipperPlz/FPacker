@@ -388,7 +388,7 @@ public class BisCompression {
                 }
                 if (rlen > 0)
                 {
-                    byte chunkSize = rpos + rlen > ctx.Dest?.Position ? (byte)(ctx.Dest.Position - rpos) : rlen;
+                    byte chunkSize = rpos + rlen > ctx.Dest?.Position ? (byte)(ctx.Dest!.Position - rpos) : rlen;
                     ctx.SetBuffer(rpos, chunkSize);
 
                     while (rlen >= chunkSize)
