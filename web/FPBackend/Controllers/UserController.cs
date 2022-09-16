@@ -17,18 +17,9 @@ public class UserController : Controller {
     
     [FPAdminAuthorize, HttpGet("{id:guid}")]
     public ActionResult<User> GetUser(Guid id) {
-        try {
-            if (HttpContext.User.HasClaim(c => c.Type == "id")) {
-                Result<User> user = _userService.GetUserById(Guid.Parse(HttpContext.User.Claims.FirstOrDefault(c => c.Type == "id")!.Value)) ?? Result<User>.Error();
-                if (!user.IsSuccess) return BadRequest(user.Errors);
-                if (user.Value.Administrator) return Ok(user.Value);
-            }
-            return Unauthorized();
-        }
-        catch (Exception e) {
-            return BadRequest(e);
-        }
-        
+        var result = _userService.GetUserById(id);
+        if (result.IsSuccess) return result.Value;
+        return BadRequest();
     }
 
 }
