@@ -49,6 +49,9 @@ public class UserService : IUserService {
         
         CreateToken: {
             var (expiration, token) = GenerateJSONWebToken(user);
+            user.AuthorizationTokenExpiration = expiration;
+            user.AuthorizationToken = token;
+            _context.SaveChanges();
             return Result.Success(new JwtResponseDTO(token, expiration));
         }
     }
